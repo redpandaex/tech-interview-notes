@@ -21,3 +21,47 @@ Kafka 消费者写入 MySQL 成功后、Offset 提交前崩溃会怎样？如何
 
 ## 参考
 - https://kafka.apache.org/documentation/#semantics
+
+---
+
+## 补充：Offset 与事务边界的时序
+
+```mermaid
+sequenceDiagram
+ participant K as Kafka Partition
+ participant C as Consumer
+ participant D as MySQL
+ K-->>C: 投递 Offset 102
+ C->>D: BEGIN; 插入去重记录; 写入成绩
+ D-->>C: COMMIT 成功
+ Note over C: 此时 Consumer 崩溃
+ Note over K: 尚未提交下一 Offset 103
+ K-->>C: 重启后可能再次交付 Offset 102
+ C->>D: 尝试相同 message_id
+ D-->>C: 唯一键冲突（已处理）
+ C->>K: 提交下一消费位置 103
+```
+
+### 核心规则
+- Kafka 提交的是**下一条要消费的位置**，处理完 offset 102 通常提交 103（对于该分区）。
+- 先 Offset 后 DB：DB 失败时可能丢业务效果。
+- 先 DB 后 Offset：可能重复交付，但可通过业务幂等抑制重复写入。
+- 数据库写入、去重记录应处在**同一个事务**里；如果第二步失败回滚，第一步也回滚。
+- 重复键冲突只代表该**业务消息 ID**已经存在记录，不能把任意 SQL 错误视为消费成功。
+
+### 幂等的两个方案
+1. 去重表：唯一 `message_id`，同事务插入和执行业务写入。失败重试时要能识别重复与其他异常。
+2. 状态机 CAS：`UPDATE task SET status='completed' WHERE id=? AND status='pending'`，通过影响行数判断状态转换是否生效，需区分不存在/已经完成/其他非法状态。
+
+### 生产边界
+
+| 风险 | 防护 |
+|---|---|
+| Kafka Rebalance 使分区重新分配 | 处理在途任务、消费线程与提交位置协调 |
+| 重试消息乱序或过期 | 任务版本/提交批次编号和条件更新 |
+| 消费失败反复重试 | 有界重试、死信队列、人工补偿 |
+| 多消费者并发处理相同业务 ID | DB 唯一约束而非先 SELECT 后 INSERT |
+| Kafka 的 EOS 被误解为数据库原子性 | Kafka 事务不自动包住 MySQL 事务 |
+
+### 常见追问
+为什么不先 `SELECT id` 再 `INSERT`？两次检查之间有并发竞态，两个消费者可同时观察到不存在；最终应由唯一约束或条件更新建立原子性。
