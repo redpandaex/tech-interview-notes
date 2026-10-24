@@ -17,34 +17,32 @@
 
 ```mermaid
 flowchart TB
-    Client["Web / App 客户端<br/>创建任务、SSE 订阅、取消、恢复"]
-    LB["API Gateway / Load Balancer<br/>鉴权、限流、TLS、长连接代理"]
-    API["API 服务<br/>创建任务、查询状态、取消"]
-    SSE["SSE Gateway 集群<br/>授权订阅、事件推送、断线恢复"]
-    DB[("任务数据库<br/>任务元数据、状态、事件游标")]
-    MQ[("可靠任务队列<br/>Kafka / Redis Streams / MQ")]
-    Worker["AI Worker 集群<br/>LangGraph、工具执行、取消检测"]
-    Log[("可回放事件日志<br/>事件序号、进度、增量或快照引用")]
-    Bus["实时通知通道<br/>Pub/Sub 可选"]
-    Object[("对象存储<br/>完整 HTML、附件、最终成果")]
+    client["Web 客户端"]
+    gateway["API Gateway"]
+    api["任务 API 服务"]
+    sse["SSE 网关集群"]
+    db["任务数据库"]
+    queue["可靠任务队列"]
+    worker["AI Worker 集群"]
+    events["可回放事件日志"]
+    notify["实时事件通知"]
+    storage["对象存储"]
 
-    Client -->|"POST /tasks"| LB
-    Client -->|"GET /tasks/:id/events"| LB
-    Client -->|"POST /tasks/:id/cancel"| LB
-    LB --> API
-    LB --> SSE
-    API -->|"创建/状态变更"| DB
-    API -->|"可靠投递"| MQ
-    MQ -->|"分配任务"| Worker
-    Worker -->|"更新状态"| DB
-    Worker -->|"持久化事件"| Log
-    Worker -->|"成果"| Object
-    Worker -.->|"通知有新事件"| Bus
-    Bus -.-> SSE
-    SSE -->|"读取缺失事件/快照"| Log
-    SSE -->|"读取状态/权限"| DB
-    SSE -->|"SSE 事件流"| Client
-    API -.->|"传递取消请求"| Worker
+    client --> gateway
+    gateway --> api
+    gateway --> sse
+    api --> db
+    api --> queue
+    queue --> worker
+    worker --> db
+    worker --> events
+    worker --> storage
+    worker -.-> notify
+    notify -.-> sse
+    sse --> events
+    sse --> db
+    sse --> client
+    api -.-> worker
 ```
 
 ### 每层职责
