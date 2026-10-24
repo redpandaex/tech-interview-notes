@@ -20,3 +20,50 @@
 ## 参考
 - https://qiankun.umijs.org/guide
 - https://module-federation.io/guide/start/
+
+---
+
+## 补充：微前端架构与发布路径
+
+```mermaid
+flowchart TD
+ Shell["主应用 Shell<br/>身份、导航协议、菜单、权限"] --> Q["qiankun 应用管理<br/>注册、激活、mount/unmount"]
+ Q --> A["React 18 子应用 A"]
+ Q --> B["React 17 子应用 B"]
+ Q --> C["Vue 2 子应用 C"]
+ Shell --> Nav["NavigationService<br/>跨应用导航协议"]
+ A -.-> Nav
+ B -.-> Nav
+ C -.-> Nav
+ A -.-> Shared["运行时共享层<br/>externals / MF shared（可选）"]
+ Shell -.-> Shared
+```
+
+### qiankun 与 Module Federation 的边界
+
+qiankun 侧重完整应用的加载和生命周期、JS 沙箱、样式隔离等；MF 侧重不同构建产物之间的运行时模块暴露与依赖共享。MF 默认不自动提供完整的微前端路由隔离和应用生命周期。二者可组合，也可替代部分能力。
+
+**Monorepo 统一安装 node_modules 不等于浏览器只有一份 React。** 子应用各自构建后仍可能把依赖打包进去。共享需明确外置或 MF shared 的版本、单实例及回退规则；React 17 和 18 不宜无评估地强制使用同一版本。
+
+### qiankun 沙箱与样式隔离
+
+- JS 沙箱的目标是隔离子应用对全局对象的副作用；不同运行模式下具体隔离与恢复行为不同。
+- `experimentalStyleIsolation` 对样式增加作用域选择器；`strictStyleIsolation` 使用 Shadow DOM。二者与 JS 沙箱不等价。
+- 弹层 Portal、全局样式、CSS 变量、Body 滚动锁、第三方组件注入的样式，均可能跨越局部隔离预期。
+
+### 渐进迁移决策
+
+```mermaid
+flowchart TD
+ A["测量现状：性能、故障、维护成本"] --> B{"问题是否真由 qiankun 引起？"}
+ B -- 否 --> C["优先治理缓存、部署、CSS、路由协议"]
+ B -- 是 --> D["在非关键子应用做 PoC"]
+ D --> E["量化共享收益、版本兼容、接入成本"]
+ E --> F{"收益足以覆盖迁移风险？"}
+ F -- 否 --> C
+ F -- 是 --> G["双运行时共存 + 灰度"]
+ G --> H["监控加载/挂载失败率与回滚"]
+```
+
+### 部署白屏排查
+`资源路径 / MIME / CDN / publicPath → bootstrap/mount/unmount 错误 → 路由 basename → React 实例/沙箱 → 权限与业务初始化`。发布采用新资源先上传、保留旧 Hash Chunk、再切换入口和灰度回滚。主子应用的路由协议应稳定，不直接暴露宿主路由库的内部对象。
