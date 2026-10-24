@@ -31,3 +31,51 @@
 - https://react.dev/reference/react/memo
 - https://react.dev/reference/react/useCallback
 - https://react.dev/reference/react/useMemo
+
+---
+
+## 补充：虚拟表格整体设计
+
+```mermaid
+flowchart LR
+ A["数据源 5000 行"] --> B["行状态/选中状态<br/>按 ID 管理"]
+ B --> C["Virtualizer<br/>高度缓存、可视范围"]
+ C --> D["可见行 + Overscan"]
+ D --> E["memo Row / Cell"]
+ E --> F["浏览器 DOM、Layout、Paint"]
+ G["ResizeObserver"] -->|"实际高度变化"| C
+```
+
+### 先定位而不是先 memo
+
+1. React Profiler 记录勾选一行前后哪些 Row 渲染、耗时为何。
+2. Chrome Performance 分开观察 Scripting、Style/Layout、Paint、Long Task。
+3. 如果 React commit 很短而 Layout 很长，减少 DOM 及布局依赖；若同步筛选/校验很重，可考虑去抖、增量计算或 Worker。
+4. 对比优化前后同一数据集的输入延迟、Commit 耗时、DOM 总数和滚动 FPS。
+
+### 动态行高计算
+
+固定行高：`startIndex = floor(scrollTop / itemHeight)`。动态行高则维护估计/已测量高度和前缀和 `prefix[i]`，找到满足 `prefix[i] <= scrollTop < prefix[i+1]` 的 i（可以二分）；`ResizeObserver` 测量行高并调整缓存，变更时维护视口滚动锚点。
+
+### 固定列和跨行选择
+
+固定列可使用 `position: sticky`，同步列宽、层叠上下文、阴影和左右偏移。虚拟滚动会卸载不可见行，因此选择状态应保存于以业务 ID 为键的持久状态，不应仅依赖 DOM checkbox 的临时状态。Shift 范围选择基于**当前排序/筛选后的逻辑行顺序**，而非当前挂载的 DOM 顺序。
+
+### React.memo 失败原因
+
+```tsx
+// 每次父组件渲染都创建新函数，导致 memo 行的 onSelect prop 变更：
+<MemoizedRow row={row} onSelect={() => handleSelect(row.id)} />
+
+// 改为稳定回调引用，子组件自己绑定 id：
+const handleSelect = useCallback((id: string) => {
+  setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+}, []);
+<MemoizedRow row={row} onSelect={handleSelect} />
+```
+
+只有其他 Props/Context 等也稳定时，未变化的行才通常可以跳过渲染。对大规模表格优先评估成熟虚拟化库，并测试动态高度与键盘可访问性。
