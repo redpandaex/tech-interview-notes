@@ -40,3 +40,53 @@ Cache-Control: public, max-age=31536000, immutable
 ## 参考
 - https://www.rfc-editor.org/rfc/rfc9111.html
 - https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control
+
+---
+
+## 补充：缓存决策流程
+
+```mermaid
+flowchart TD
+ A["收到资源请求"] --> B{"找到可匹配缓存？URL / 方法 / Vary"}
+ B -- 否 --> N["发起正常网络请求"]
+ B -- 是 --> C{"缓存是否允许无需验证地复用？"}
+ C -- 是 --> F["直接复用已存储响应"]
+ C -- 否 --> D{"有 ETag / Last-Modified？"}
+ D -- 是 --> E["发送条件请求"]
+ D -- 否 --> N
+ E --> G{"服务器返回 304？"}
+ G -- 是 --> H["更新缓存元数据并复用已存储响应体"]
+ G -- 否 --> I["处理完整响应，例如 200"]
+ N --> I
+```
+
+**解释**：流程为常见 GET 缓存的教学简化，实际还受缓存指令、请求指令、授权、共享/私有缓存和规范规则影响。`Vary` 取自缓存响应，匹配的是原请求与当前请求的对应请求头值。
+
+### 显式和启发式新鲜度
+
+例如 `max-age=3600` 表示 3600 秒的新鲜度生命周期，不能仅按本地写入时刻计算，要考虑 `Date`、`Age` 等。若没有明确新鲜度且满足启发式缓存条件，可能参考 `Last-Modified` 估算，不是显式新鲜度过期后再启用一次。
+
+| Cache-Control | 新鲜时 | 过期时 |
+|---|---|---|
+| `max-age=3600` | 可复用 | 通常需要验证或重新获取 |
+| `no-cache` | 复用前也需要验证 | 需要验证 |
+| `must-revalidate, max-age=3600` | 可直接复用 | 不允许随意复用旧响应 |
+| `no-store` | 不应存储此响应 | 不适用 |
+
+### 条件请求时序
+
+```mermaid
+sequenceDiagram
+ participant B as 浏览器
+ participant N as Nginx/服务器
+ B->>N: GET /index.html
+ N-->>B: 200 + ETag: "v1" + body
+ Note over B: 缓存需要重新验证
+ B->>N: GET /index.html + If-None-Match: "v1"
+ N-->>B: 304 Not Modified
+ Note over B: 更新相关元数据，复用旧 body
+```
+
+### 发布问题
+
+`index.html: no-cache` + `assets/*.hash.js: max-age=31536000, immutable` 是常见策略。先上传新资源，再切换入口；保留旧资源，防止已打开的旧 SPA 动态导入遭遇 404。若已运行页面从不重新请求入口，`no-cache` 不会自动让它更新，需版本检测并提示刷新、保护未保存内容。
