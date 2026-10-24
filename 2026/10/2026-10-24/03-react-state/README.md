@@ -41,3 +41,57 @@ const handleClick = () => {
 - https://react.dev/learn/queueing-a-series-of-state-updates
 - https://react.dev/learn/state-as-a-snapshot
 - https://github.com/reactwg/react-18/discussions/21
+
+---
+
+## 补充：状态快照、队列和调度
+
+```mermaid
+flowchart TD
+ A["组件渲染：count = 0"] --> B["事件处理函数闭包捕获 count = 0"]
+ B --> C["多次 setCount：产生更新记录"]
+ C --> D["React 根据调度规则处理队列"]
+ D --> E["计算新 state"]
+ E --> F["新一轮 Render"]
+ F --> G["Commit 已变化的 UI"]
+```
+
+**三个概念不要混淆：**
+1. Snapshot：事件处理函数读取的是创建该闭包时的 state。
+2. Update Queue：记录“替换为某值”或“应用 updater”的更新，React 按调度规则处理。
+3. Batching：使多个更新尽可能合并渲染和提交，减少重复工作。源码中 Hooks 队列的数据结构不是批处理机制本身。
+
+### 混合更新逐条推导
+
+```tsx
+setCount(count + 1);        // replace with 1
+setCount(prev => prev + 1); // update 1 -> 2
+setCount(count + 1);        // replace with 1 again
+setCount(prev => prev + 1); // update 1 -> 2
+console.log(count);         // 0, still current snapshot
+```
+
+| 操作 | 累计待计算状态 |
+|---|---:|
+| 起始 | 0 |
+| 替换为 1 | 1 |
+| +1 | 2 |
+| 替换为 1 | 1 |
+| +1 | 2 |
+
+最终下一轮渲染显示 2，同步日志为 0。
+
+### React 18 自动批处理
+
+```tsx
+setTimeout(() => {
+  setCount(v => v + 1);
+  setFlag(v => !v);
+}, 1000);
+```
+
+使用 `createRoot` 的 React 18 可在 React 事件以外场景（如定时器、Promise 回调、原生事件）应用自动批处理。不要理解成“React 永远只渲染一次”；同步边界、`flushSync`、更新优先级和 StrictMode 的开发检查会影响实际观察。
+
+### 源码学习建议
+
+先掌握 Snapshot → Queue → Batching → Render/Commit，再学习 Fiber、Lane、Hook queue 的 circular linked list。观察函数组件被调用的次数与 DOM 真正提交的次数并非同一个指标。
