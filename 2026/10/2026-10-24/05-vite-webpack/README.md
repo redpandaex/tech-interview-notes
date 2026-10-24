@@ -35,3 +35,40 @@
 - https://vite.dev/guide/dep-pre-bundling.html
 - https://vite.dev/guide/api-hmr.html
 - https://webpack.js.org/configuration/experiments/#experimentslazycompilation
+
+---
+
+## 补充：Vite 开发加载与 HMR 时序
+
+```mermaid
+sequenceDiagram
+ participant B as Browser ESM Loader
+ participant V as Vite Dev Server
+ B->>V: GET /src/main.ts
+ V-->>B: 按需转换后的 JS
+ B->>V: GET /src/App.tsx
+ V-->>B: 按需转换后的 JS
+ Note over B: 只有执行动态 import 才请求 Editor
+ B->>V: GET /src/Editor.tsx
+ V-->>B: 转换后模块
+ Note over V: 修改 App.tsx
+ V-->>B: WebSocket HMR update 通知
+ B->>V: 获取带更新参数的模块
+ V-->>B: 新模块
+ Note over B: HMR 边界接收或退化为整页刷新
+```
+
+### 必须区分的三个处理阶段
+- **依赖扫描/预构建**：第三方依赖的 CommonJS/UMD 兼容、依赖内部模块合并及缓存，不等同于构建整个应用。
+- **开发源码转换**：模块按需请求时转换 TS/TSX 等，浏览器加载 ESM。
+- **生产 Bundle**：最终仍需优化依赖图、Chunk、资源输出和压缩。
+
+### 热更新为什么快
+
+Vite 根据模块图找修改模块与 HMR 接受边界，通知浏览器更新对应模块；Fast Refresh 可在满足条件时保留 React 组件状态。**不是所有更新都保留状态，也不是所有变更都不触发全页刷新。** Webpack 同样支持 HMR，不应把二者说成“Vite 有 HMR，Webpack 没有”。
+
+### 工具链版本
+早期 Vite 生产使用 Rollup（主要 JavaScript），预构建使用 esbuild（Go）；Vite 8 转向 Rolldown（Rust）与 Oxc（Rust）相关工具链。对比构建速度时必须标注版本、插件集和缓存冷热状态。
+
+### 生产迁移评估
+实际迁移要对比冷启动、首页首次转换耗时、HMR p95、生产构建耗时、Chunk 总量、Source Map、插件适配、兼容性和回滚能力。单凭一个冷启动数字不能证明架构迁移值得。
