@@ -1,3 +1,22 @@
-# 第 3 题
+# 第 3 题：真实作答与追问
 
-已完成答题。第一轮：用户判断旧请求 A 最终覆盖 B，并提出 AbortController。第二轮：用户正确识别 StrictMode 开发模式行为，但将 abort 后的 Promise 错认为 resolve。正确情况通常为 AbortError rejection。评分 80/100。
+状态：已完成。
+
+## 第一轮
+用户原话：
+
+> 1. A,因为A的回调函数在后面2s以后才会执行
+> 2. 讲函数提取出来然后使用await?获取加一个AbortController,在每次发送请求前先取消上一个请求
+> 3. 不能吧
+
+点评：最终显示 A，正确。await 不能消除竞态；取消旧请求是合理方向。
+
+## 第二轮
+用户原话：
+
+> 1. 这是react为了调试方便特意设计的,在生产中不会有
+> 2. 应该是resolve吧
+
+点评：StrictMode 判断基本正确。abort 通常导致尚未完成的 fetch 以 AbortError 拒绝，不是 resolve。
+
+评分：80/100。
