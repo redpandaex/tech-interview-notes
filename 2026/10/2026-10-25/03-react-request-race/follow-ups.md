@@ -1,5 +1,3 @@
-# 第 3 题：真实作答与追问
+# 第 3 题
 
-状态：待作答。
-
-尚未收到用户对本题的回答。请勿预填或虚构回答、追问和评分。
+已完成答题。第一轮：用户判断旧请求 A 最终覆盖 B，并提出 AbortController。第二轮：用户正确识别 StrictMode 开发模式行为，但将 abort 后的 Promise 错认为 resolve。正确情况通常为 AbortError rejection。评分 80/100。
