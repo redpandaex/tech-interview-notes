@@ -1,15 +1,5 @@
-# Day 2 · 第 10 题：多租户 SaaS 权限系统设计
+# Day 2 Q10
 
-> 日期：2026-10-25（北京时间）  
-> 分类：场景/系统设计  
-> 状态：待作答
+Status: completed.
 
-## 面试题
-
-组织、部门、项目和用户的 RBAC 与数据权限；设计跨租户隔离、权限缓存、角色变更和审计。
-
-请结合工程实践说明关键原理、设计取舍和失败边界。**作答前不公布答案。** 每题最多追问两轮。
-
-## 记录
-
-真实回答与追问记录见 [follow-ups.md](follow-ups.md)。完成后补充完整解析、必要 Mermaid 图、TypeScript/TSX 示例与权威资料。
+See [follow-ups.md](follow-ups.md) for answers and feedback.
