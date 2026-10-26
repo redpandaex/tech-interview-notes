@@ -1,19 +1,53 @@
 # Vue KeepAlive 与多标签缓存 · 追问与答题记录
 
-**状态：待作答**
+**状态：主问题已作答，第一轮追问待答**
 
-## 用户原始回答
+## 用户原始回答（原文）
 
-待用户作答；不得虚构。
+> 1.
+> 貌似是缓存了组件的实例
+> 2.
+> 挂载,卸载激活失活
+> 3.
+> 正常引入这个组件就行了吧,没太看懂
 
-## 面试官第一轮追问
+## 初步点评
 
-待作答后决定是否追问。
+1. **正确**：`KeepAlive` 缓存组件实例与 VNode，并保留相关 DOM 以便恢复，而不只是缓存 HTML。
+2. **名称正确，触发时机未展开**：首次挂载 `mounted` 和 `activated`；离开缓存组件 `deactivated`；重新激活仅 `activated`；真正卸载才 `unmounted`。最终卸载缓存组件也会触发 `deactivated`。
+3. **尚未理解**：同一路由组件 `CustomerDetail` 可能用于 `/customer/1001` 与 `/customer/1002`，Vue Router 会复用相同组件实例。要让不同客户详情页分别缓存表单状态，可通过 `:key` 区分业务实例。
 
-## 面试官第二轮追问（如有）
+## 讲解示例
+
+```vue
+<RouterView v-slot="{ Component, route }">
+  <KeepAlive :max="10">
+    <component :is="Component" :key="route.fullPath" />
+  </KeepAlive>
+</RouterView>
+```
+
+- `route.fullPath` 可区分不同路由地址，但包含 query，可能导致过多缓存。
+- 更稳定的方案可以按业务标识生成 `key`，例如 `route.name + ':' + route.params.id`，具体取决于业务语义。
+- `max` 是缓存上限，超过上限时按最近最少使用策略淘汰，不等于关闭某个业务 Tab 就自动移除其缓存。
+- 即使不使用 key，也可通过 watch 路由参数更新数据，但如果要保留每个客户独立表单状态，独立 key 通常更合适。
+
+## 第一轮追问（待答）
+
+有两个详情页：
+
+- `/customer/1001`：客户 A
+- `/customer/1002`：客户 B
+
+两者都渲染 `CustomerDetail`，使用 `KeepAlive`。
+
+1. 如果希望两个客户的表单草稿分别保留，你会给组件设置什么 `key`？
+2. 从 A 切换到 B，再切回 A，A 第二次出现时通常会触发 `mounted` 还是 `activated`？
+
+## 第二轮追问（如有）
 
 待第一轮回答后决定；最多两轮。
 
-## 点评与改进建议
+## 评分
 
-待用户真实回答后补充。
+待追问结束后评定。
