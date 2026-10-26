@@ -43,3 +43,32 @@ type EventPayload<K extends EventName> = ???;
 5. 下一步重点：泛型约束、索引访问类型和事件名与载荷类型的对应关系。
 
 > 待用户回答第一轮追问后补充实际作答、追问与最终评价。
+
+## 第一轮追问后续交流
+
+用户原话：
+
+> 不记得了,这个应该是利用keyof去编辑生成联合类型?我刚刚有点没看懂你的题目其实
+
+面试官解释：
+
+- `keyof Events` 自动提取属性名组成联合类型；
+- `Events["login"]` 是类型层面的索引访问；
+- `type EventPayload<K extends keyof Events> = Events[K]` 建立事件名称与载荷类型关联；
+- 原题需求表述偏跳跃，改用更基础的类型推导题检查理解。
+
+**当前待回答的简化追问：**
+
+```ts
+interface User {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+type A = keyof User;
+type B = User["name"];
+type C = User["id" | "active"];
+```
+
+请说出 A、B、C 的类型；暂不公布结果，等待用户回答。
