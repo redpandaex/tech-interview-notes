@@ -72,3 +72,35 @@ type C = User["id" | "active"];
 ```
 
 请说出 A、B、C 的类型；暂不公布结果，等待用户回答。
+
+## 简化追问：用户回答及点评
+
+用户原话：
+
+> A是联合类型 "id"|"name"|"active"
+> b是string类型
+> c是number|boolean
+
+**评价：3/3，全部正确。** 用户正确理解 `keyof T`、`T[K]` 以及联合索引对应的联合属性类型。
+
+## 第二轮追问（已提出，待回答）
+
+```ts
+interface Events {
+  login: { userId: string; token: string };
+  logout: { userId: string };
+}
+class EventBus {
+  emit<K extends keyof Events>(event: K, payload: Events[K]) {}
+}
+const bus = new EventBus();
+bus.emit("login", { userId: "1001", token: "abc" }); // A
+bus.emit("login", { userId: "1001" }); // B
+bus.emit("logout", { userId: "1001" }); // C
+bus.emit("register", { userId: "1001" }); // D
+```
+
+1. 判断 A/B/C/D 哪些调用报类型错误及原因。
+2. 解释泛型 `K` 关联事件名和载荷，与 `emit(event: keyof Events, payload: Events[keyof Events])` 的区别。
+
+**状态：第二轮追问待答。暂不公布答案。**
