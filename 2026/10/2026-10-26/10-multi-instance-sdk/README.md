@@ -12,7 +12,7 @@
 
 ## 一、推荐架构：框架无关 API + React 内部渲染
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
     Host[Vue 2 / Vue 3 / React / Vanilla JS] --> API[createOrderSDK / mount / update / submit / destroy]
     API --> IA[SDK Instance A]
@@ -25,11 +25,11 @@ flowchart TD
     IB --> RB[React Root B + Shadow Root B]
     RA --> MA[Portal Container A]
     RB --> MB[Portal Container B]
-\`\`\`
+```
 
 ### 对外 API
 
-\`\`\`ts
+```ts
 export interface OrderOptions {
   token: string;
   userId: string;
@@ -52,15 +52,15 @@ export interface OrderSDK {
 export function createOrderSDK(options: OrderOptions): OrderSDK {
   return new OrderSDKImpl(options);
 }
-\`\`\`
+```
 
 - **命令式 SDK**：对外只要求 DOM 容器和 JS API，内部 React 版本对宿主透明；实例化与 mount 分开，明确生命周期。
-- **Web Components**：也可提供 \`<order-widget>\` 自定义元素适配层，适合标签式嵌入。Custom Elements 的 \`connectedCallback\`/\`disconnectedCallback\` 可转调 SDK 的挂载与卸载；复杂对象、事件与 React 版本兼容仍需适配。
-- **打包分发**：优先 ESM，按需 UMD/IIFE 供脚本接入；\`window.OrderSDK\` 是分发入口，不是隔离手段。按项目需要明确 React 是否打包进 SDK、版本冲突、重复运行时体积、CSS 资源加载及 SSR 下仅在客户端 mount。
+- **Web Components**：也可提供 `<order-widget>` 自定义元素适配层，适合标签式嵌入。Custom Elements 的 `connectedCallback`/`disconnectedCallback` 可转调 SDK 的挂载与卸载；复杂对象、事件与 React 版本兼容仍需适配。
+- **打包分发**：优先 ESM，按需 UMD/IIFE 供脚本接入；`window.OrderSDK` 是分发入口，不是隔离手段。按项目需要明确 React 是否打包进 SDK、版本冲突、重复运行时体积、CSS 资源加载及 SSR 下仅在客户端 mount。
 
 ### 生命周期状态机
 
-\`\`\`mermaid
+```mermaid
 stateDiagram-v2
     [*] --> CREATED
     CREATED --> MOUNTED: mount
@@ -68,9 +68,9 @@ stateDiagram-v2
     CREATED --> DESTROYED: destroy
     MOUNTED --> DESTROYED: destroy
     DESTROYED --> DESTROYED: destroy (no-op)
-\`\`\`
+```
 
-对于 \`update\`/\`submit\` 在 CREATED 状态是否可用、是否支持重复 mount、destroy 后是否可复活，必须有明确 API 契约；示例采用一次挂载、销毁不可复活的设计。
+对于 `update`/`submit` 在 CREATED 状态是否可用、是否支持重复 mount、destroy 后是否可复活，必须有明确 API 契约；示例采用一次挂载、销毁不可复活的设计。
 
 ## 二、多实例隔离：资源所有权
 
@@ -78,12 +78,12 @@ stateDiagram-v2
 
 ### 错误：修改全局 Axios 默认 Token
 
-\`\`\`ts
+```ts
 import axios from "axios";
 
 class BadSDK {
   constructor(token: string) {
-    axios.defaults.headers.common.Authorization = \`Bearer \${token}\`;
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`;
   }
   getPrice() {
     return axios.get("/api/price");
@@ -93,11 +93,11 @@ class BadSDK {
 const a = new BadSDK("token-A");
 const b = new BadSDK("token-B");
 a.getPrice(); // 可能错误地携带 token-B
-\`\`\`
+```
 
 ### 正确：每实例独立 HTTP Client
 
-\`\`\`ts
+```ts
 import axios, { type AxiosInstance } from "axios";
 
 class OrderHttpClient {
@@ -106,12 +106,12 @@ class OrderHttpClient {
   constructor(token: string) {
     this.client = axios.create({
       baseURL: "/api",
-      headers: { Authorization: \`Bearer \${token}\` },
+      headers: { Authorization: `Bearer ${token}` },
     });
   }
 
   updateToken(token: string) {
-    this.client.defaults.headers.common.Authorization = \`Bearer \${token}\`;
+    this.client.defaults.headers.common.Authorization = `Bearer ${token}`;
   }
 
   async getPrice(quantity: number, signal?: AbortSignal): Promise<number> {
@@ -122,13 +122,13 @@ class OrderHttpClient {
     return data.price;
   }
 }
-\`\`\`
+```
 
-共享 Axios **库**没问题，共享 \`axios.defaults\` 或模块级可变 Token 有问题。还需考虑 Cookie、LocalStorage、共享拦截器及同源身份状态可能造成的跨实例耦合。不要把错误 Token 交给后端“自行判断”，后端可能把它视为 B 的合法请求。
+共享 Axios **库**没问题，共享 `axios.defaults` 或模块级可变 Token 有问题。还需考虑 Cookie、LocalStorage、共享拦截器及同源身份状态可能造成的跨实例耦合。不要把错误 Token 交给后端“自行判断”，后端可能把它视为 B 的合法请求。
 
 ### Store 隔离
 
-\`\`\`tsx
+```tsx
 // 伪代码：Store Factory 每次调用创建新 store
 function createOrderStore() {
   return createStore<OrderState>()(() => ({ quantity: 1 }));
@@ -140,15 +140,15 @@ root.render(
     <OrderApp />
   </OrderStoreProvider>
 );
-\`\`\`
+```
 
-React \`useState\` 在不同组件树内天然独立，但导入同一个模块级 Zustand/Redux store 时仍然共享。实例级 Context Provider 不能修复被所有实例引用的同一个可变 Store。
+React `useState` 在不同组件树内天然独立，但导入同一个模块级 Zustand/Redux store 时仍然共享。实例级 Context Provider 不能修复被所有实例引用的同一个可变 Store。
 
 ## 三、Shadow DOM 与 Portal
 
-Shadow DOM 封装 DOM 子树，普通外部 CSS 选择器不能直接匹配内部节点，内部样式也通常不匹配外部节点。它**不隔离** JS 全局变量、Token、网络请求、Cookie、window 事件监听器；CSS 继承属性、自定义属性、\`::part\` 等机制仍可跨越边界，不能将其视为安全沙箱。
+Shadow DOM 封装 DOM 子树，普通外部 CSS 选择器不能直接匹配内部节点，内部样式也通常不匹配外部节点。它**不隔离** JS 全局变量、Token、网络请求、Cookie、window 事件监听器；CSS 继承属性、自定义属性、`::part` 等机制仍可跨越边界，不能将其视为安全沙箱。
 
-\`\`\`tsx
+```tsx
 const host = document.createElement("div");
 container.appendChild(host);
 const shadowRoot = host.attachShadow({ mode: "open" });
@@ -162,21 +162,21 @@ root.render(<OrderApp portalContainer={modalContainer} />);
 
 // OrderApp 内：
 // createPortal(<OrderModal />, portalContainer);
-\`\`\`
+```
 
-**反例**：\`createPortal(<OrderModal />, document.body)\` 会把弹窗实际 DOM 放到 Shadow Root 外，失去该 Shadow Root 的普通 CSS 选择器隔离。React Context/React 事件树仍按 React 组件树运作，不能据此推断 CSS 也隔离。
+**反例**：`createPortal(<OrderModal />, document.body)` 会把弹窗实际 DOM 放到 Shadow Root 外，失去该 Shadow Root 的普通 CSS 选择器隔离。React Context/React 事件树仍按 React 组件树运作，不能据此推断 CSS 也隔离。
 
-推荐每个 SDK 实例持有独立 \`ModalManager\` 和 \`modalContainer\`，由 SDK 销毁时清理。第三方组件库需要配置 Portal 容器、CSS-in-JS 注入位置。共享 \`document.body.style.overflow\` 滚动锁、全局 Escape 监听和焦点管理时，使用协调器/引用计数，避免 A 关闭弹窗时错误恢复 B 仍需要的滚动锁。
+推荐每个 SDK 实例持有独立 `ModalManager` 和 `modalContainer`，由 SDK 销毁时清理。第三方组件库需要配置 Portal 容器、CSS-in-JS 注入位置。共享 `document.body.style.overflow` 滚动锁、全局 Escape 监听和焦点管理时，使用协调器/引用计数，避免 A 关闭弹窗时错误恢复 B 仍需要的滚动锁。
 
 ## 四、异步计价竞态：latest request wins
 
-场景：数量 1、2、3 对应 R1、R2、R3；响应按 R3、R1、R2 返回。如果直接每次 \`setPrice\`，最终错误显示数量 2 的报价。
+场景：数量 1、2、3 对应 R1、R2、R3；响应按 R3、R1、R2 返回。如果直接每次 `setPrice`，最终错误显示数量 2 的报价。
 
 **不推荐**通过互斥锁串行执行所有计价请求：最新报价会等待已经过期的请求。优先采用递增序号（或唯一请求 ID）过滤过期响应，并配合 AbortController 节省资源。
 
 ### 可复用的 TypeScript 服务实现
 
-\`\`\`ts
+```ts
 export class PriceService {
   private seq = 0;
   private active: AbortController | null = null;
@@ -191,10 +191,10 @@ export class PriceService {
     this.active = controller;
 
     try {
-      const response = await fetch(\`/api/price?quantity=\${quantity}\`, {
+      const response = await fetch(`/api/price?quantity=${quantity}`, {
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data: { price: number } = await response.json();
 
@@ -221,23 +221,23 @@ export class PriceService {
     this.active = null;
   }
 }
-\`\`\`
+```
 
-调用方收到 \`undefined\` 代表请求过期/已取消，不应更新 UI；若需要区分原因，可使用 \`{status:"stale"|"aborted"|"ok"}\` 的判别联合类型。提交价格前还需确认当前 SDK 未销毁。价格和数量应成对保存，避免最新数量配旧价格。对提交订单这类**有副作用**的请求，客户端 abort 不等于服务端撤销；还需服务端幂等键与订单状态查询。
+调用方收到 `undefined` 代表请求过期/已取消，不应更新 UI；若需要区分原因，可使用 `{status:"stale"|"aborted"|"ok"}` 的判别联合类型。提交价格前还需确认当前 SDK 未销毁。价格和数量应成对保存，避免最新数量配旧价格。对提交订单这类**有副作用**的请求，客户端 abort 不等于服务端撤销；还需服务端幂等键与订单状态查询。
 
 ### React Effect 的清理（只负责 Effect 自己创建的任务）
 
-\`\`\`tsx
+```tsx
 useEffect(() => {
   const controller = new AbortController();
   let active = true;
 
   (async () => {
     try {
-      const res = await fetch(\`/api/price?quantity=\${quantity}\`, {
+      const res = await fetch(`/api/price?quantity=${quantity}`, {
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (active && !controller.signal.aborted) setPrice(data.price);
     } catch (error) {
@@ -250,13 +250,13 @@ useEffect(() => {
     controller.abort();
   };
 }, [quantity]);
-\`\`\`
+```
 
-React Effect cleanup 会在依赖变更及组件卸载时执行；但 SDK 类直接调用的 \`submit()\` 或服务层任务**不一定**属于这个 Effect，不能只靠组件卸载处理所有异步任务。
+React Effect cleanup 会在依赖变更及组件卸载时执行；但 SDK 类直接调用的 `submit()` 或服务层任务**不一定**属于这个 Effect，不能只靠组件卸载处理所有异步任务。
 
 ## 五、幂等 destroy 与资源释放
 
-\`\`\`ts
+```ts
 import type { Root } from "react-dom/client";
 
 class OrderSDKImpl {
@@ -290,11 +290,11 @@ class OrderSDKImpl {
     // 在此将最新价格交给当前实例 Store / UI
   }
 }
-\`\`\`
+```
 
-这是**生命周期骨架**，实际还需实现 \`mount/update/submit\`、事件回调、ModalManager 清理和错误传播。对公开方法定义销毁后行为（例如抛 \`SDK_DESTROYED\`），而不是让它们访问空引用。连续 \`destroy()\` 应 no-op；如清理函数可能抛错，生产中应设计尽力释放其他资源和错误报告机制。
+这是**生命周期骨架**，实际还需实现 `mount/update/submit`、事件回调、ModalManager 清理和错误传播。对公开方法定义销毁后行为（例如抛 `SDK_DESTROYED`），而不是让它们访问空引用。连续 `destroy()` 应 no-op；如清理函数可能抛错，生产中应设计尽力释放其他资源和错误报告机制。
 
-\`\`\`mermaid
+```mermaid
 sequenceDiagram
     participant U as 宿主
     participant S as SDK
@@ -312,7 +312,7 @@ sequenceDiagram
     Note over S: 不再更新已销毁实例
     U->>S: destroy()
     Note over S: no-op
-\`\`\`
+```
 
 ## 六、方案对比
 
@@ -332,7 +332,7 @@ sequenceDiagram
 1. **框架矩阵**：Vue 2、Vue 3、React、原生 JS 各做最小宿主页面，验证 mount/update/submit/destroy、事件、打包和依赖版本。
 2. **多实例认证**：同页挂 A/B，分别使用 Token A/B；模拟交错请求，断言请求头不会串扰。
 3. **多实例状态/弹窗**：A 改数量不影响 B；A 开关弹窗不误删 B；Portal 必须位于各自 Shadow Root 内。
-4. **CSS**：宿主设置通用 \`button\`、\`div\` 规则，确认 SDK 样式稳定；SDK 样式不影响宿主；验证 CSS 变量/继承行为。
+4. **CSS**：宿主设置通用 `button`、`div` 规则，确认 SDK 样式稳定；SDK 样式不影响宿主；验证 CSS 变量/继承行为。
 5. **竞态**：用 MSW 或可控 Promise 强制 R3、R1、R2 顺序返回，最终只展示 R3。
 6. **卸载**：请求 pending 时 destroy；迟到响应不得触发状态更新或事件；清除监听、计时器、Observer、React Root、SDK 自建 DOM。
 7. **幂等**：连续 destroy 两次不抛错；destroy 后 update/submit 按契约拒绝；重新创建**新实例**正常。
