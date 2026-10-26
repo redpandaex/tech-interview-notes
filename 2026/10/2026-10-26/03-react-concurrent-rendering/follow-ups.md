@@ -1,6 +1,6 @@
 # React Suspense、并发渲染与 Transition · 追问与答题记录
 
-**状态：第一轮追问已回答并讲解，待确认理解**
+**状态：已完成追问；最终评分 80/100**
 
 ## 用户原始回答（原文）
 
@@ -57,4 +57,18 @@ function SearchPage() {
 - `startTransition` 回调本身立即执行，降低优先级的是其中调度的 React 状态更新，并不是将任意同步计算放到后台线程。
 - 官方文档：https://react.dev/reference/react/useTransition 和 https://react.dev/reference/react/useDeferredValue
 
-**状态：待用户确认理解后再进行下一轮追问或结束。**
+**状态：已确认理解并结束本题。**
+
+## 理解确认：用户原始回答
+
+面试官问题：父组件通过 props 传入 keyword，子组件无法控制父组件 setState，如何延迟大型列表更新？
+
+> useDeferredValue
+
+**回答正确。** 子组件可调用 `const deferredKeyword = useDeferredValue(keyword)`，将延迟值传给列表；若列表耗时，还应考虑 `React.memo` 防止紧急渲染时重复计算。参考 React 官方 useDeferredValue 文档。
+
+## 最终评价
+
+**80/100**：理解并发渲染不是多线程、Render 不保证 Commit、延迟值与状态更新的基本区别；对调度时机、长同步计算与 Suspense 边界需继续加强。
+
+详见 [README.md](./README.md)。
