@@ -104,3 +104,16 @@ bus.emit("register", { userId: "1001" }); // D
 2. 解释泛型 `K` 关联事件名和载荷，与 `emit(event: keyof Events, payload: Events[keyof Events])` 的区别。
 
 **状态：第二轮追问待答。暂不公布答案。**
+
+## 第二轮追问：用户回答与最终点评
+
+用户原话：
+
+> D吧
+> ,因为这个泛型类型不好确认?
+
+正确结果：B、D 报错；B 的 login 缺少 token，D 的 register 不是合法事件名。A、C 正确。
+
+泛型 K 的作用是关联事件名称与 payload 的类型，不是解决无法确定泛型的问题。独立使用 keyof Events 和 Events[keyof Events] 会丢失两参数关联。
+
+最终评价：65/100。已完成两轮追问；后续重点复习泛型约束、类型关联及事件总线实现。
