@@ -201,3 +201,111 @@ sequenceDiagram
 - [TypeScript Handbook — Indexed Access Types](https://www.typescriptlang.org/docs/handbook/2/indexed-access-types.html)
 - [TypeScript Handbook — Generics](https://www.typescriptlang.org/docs/handbook/2/generics.html)
 - [TypeScript Handbook — TypeScript for the New Programmer](https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html)
+## 作答与评审状态
+
+- 用户已完成主问题与两轮追问；最终评价 **65/100**。
+- 原始回答、追问和点评：[follow-ups.md](./follow-ups.md)。
+
+## 标准答案：类型约束
+
+```ts
+type EventName = keyof Events;
+type Payload<K extends keyof Events> = Events[K];
+
+function emit<K extends keyof Events>(event: K, payload: Events[K]) {}
+emit("login", { userId: "u1", token: "t1" });
+// @ts-expect-error 缺少 token
+emit("login", { userId: "u1" });
+// @ts-expect-error 不存在的事件
+emit("register", { userId: "u1" });
+```
+
+- `keyof Events` 提取合法事件名的联合类型。
+- `Events[K]` 获取特定事件的参数类型。
+- 泛型 `K` 将事件名和参数类型绑定；若两个参数分别使用 `keyof Events` 与 `Events[keyof Events]`，就会丢失这种关联。
+
+## 可执行实现
+
+```ts
+type Listener = (payload: unknown) => void;
+
+class EventBus<E extends object> {
+  private listeners = new Map<keyof E, Set<Listener>>();
+
+  on<K extends keyof E>(event: K, fn: (payload: E[K]) => void): () => void {
+    let set = this.listeners.get(event);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(event, set);
+    }
+    set.add(fn as Listener);
+    return () => this.off(event, fn);
+  }
+
+  off<K extends keyof E>(event: K, fn: (payload: E[K]) => void): void {
+    const set = this.listeners.get(event);
+    set?.delete(fn as Listener);
+    if (set?.size === 0) this.listeners.delete(event);
+  }
+
+  once<K extends keyof E>(event: K, fn: (payload: E[K]) => void): () => void {
+    const wrapped = (payload: E[K]): void => {
+      this.off(event, wrapped); // 先解绑，防止重入
+      fn(payload);
+    };
+    return this.on(event, wrapped);
+  }
+
+  emit<K extends keyof E>(event: K, payload: E[K]): void {
+    for (const fn of [...(this.listeners.get(event) ?? [])]) fn(payload);
+  }
+
+  destroy(): void {
+    this.listeners.clear();
+  }
+}
+
+const bus = new EventBus<Events>();
+const unsubscribe = bus.on("login", ({ userId }) => console.log(userId));
+bus.emit("login", { userId: "1001", token: "abc" });
+unsubscribe();
+bus.once("logout", ({ userId }) => console.log(userId));
+bus.emit("logout", { userId: "1001" });
+bus.destroy();
+```
+
+内部监听器存储统一为 `unknown` 参数，使用类型断言实现存储；对外 API 保留 `E[K]` 关联约束。该例采用同步分发；监听器抛错会中断后续分发，生产环境需约定错误隔离策略。
+
+## 边界与设计取舍
+
+1. `off` 移除某个事件的指定函数；`destroy` 清空实例内所有监听器。
+2. `once` 使用包装函数，调用前解绑，防止递归触发重复执行。
+3. 使用快照遍历监听器意味着本轮触发期间的移除不影响快照中已存在的回调。
+4. `Set` 会去重同一事件的同一函数引用。
+5. `emit` 的类型检查只发生在编译时。运行时从 JSON、网络、插件或 JS 调用方收到的数据仍需做 Schema 校验。
+6. 若事件名参数本身是联合类型变量，泛型 `K` 也可能推断为联合；需要更严格的成对约束时可用映射元组联合与控制流缩窄。
+7. 扩展事件类型可使用接口组合：`type AppEvents = AuthEvents & OrderEvents`；大型系统应避免事件名冲突，约定命名空间与版本。
+
+## 流程示意
+
+```mermaid
+sequenceDiagram
+  participant App as 业务代码
+  participant Bus as EventBus
+  participant Store as 监听器Map
+  App->>Bus: on(event, callback)
+  Bus->>Store: 添加回调
+  App->>Bus: emit(event, payload)
+  Bus->>Store: 获取回调快照
+  loop 每个回调
+    Bus->>App: callback(payload)
+  end
+  App->>Bus: off / destroy
+  Bus->>Store: 移除 / 清空
+```
+
+## 权威参考
+
+- [TypeScript: keyof](https://www.typescriptlang.org/docs/handbook/2/keyof-types.html)
+- [TypeScript: Indexed Access Types](https://www.typescriptlang.org/docs/handbook/2/indexed-access-types.html)
+- [TypeScript: Generics](https://www.typescriptlang.org/docs/handbook/2/generics.html)
