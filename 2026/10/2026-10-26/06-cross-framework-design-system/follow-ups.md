@@ -1,6 +1,6 @@
 # 跨技术栈组件库与设计系统治理 · 追问与答题记录
 
-**状态：主问题已作答，第一轮追问待答**
+**状态：第一轮追问已回答，第二轮追问待答**
 
 ## 用户原始回答（原文）
 
@@ -32,7 +32,7 @@
 - Shadow DOM 默认阻隔外部普通 CSS 选择器，需设计 CSS 变量、`::part` 等主题入口。
 - 需要处理 CustomEvent、属性与 JS property、表单、SSR、旧浏览器及框架集成边界。
 
-## 第一轮追问（待答）
+## 第一轮追问（已答）
 
 公司提供一个基于 Web Components 的按钮：
 
@@ -45,10 +45,36 @@
 1. Vue 2 或 NEJ 项目如果想更改按钮内部的背景色，直接写 `company-button button { background: red }` 能生效吗？为什么？你会提供什么主题定制接口？
 2. 宿主应用如何获取 `confirm` 事件携带的 `id`？请说出一个原生 JS 方案。
 
-## 第二轮追问（如有）
+## 第二轮追问（待答）
 
-待第一轮回答后决定；最多两轮。
+如果组件不是在 custom element 宿主节点上派发事件，而是在 Shadow DOM **内部的 button 元素**上派发：
+
+```ts
+button.dispatchEvent(new CustomEvent('confirm', { detail: { id: 123 } }));
+```
+
+宿主代码使用 `document.querySelector('company-button')?.addEventListener('confirm', handler)` 是否一定能收到？如果不能，创建 `CustomEvent` 时还应配置什么选项？
+
+## 第一轮追问：用户原始回答
+
+> 1. 不能,webcomponent内部德阳市不会被外部css修改,我会给这个组件提供一个或者多个属性,让外部调用来调整样式
+> 2. 使用addEventListener?
+
+### 评价与补充
+
+- **第 1 问正确**：Shadow DOM 的普通内部节点无法通过外部 `company-button button` 选择器匹配；组件可以提供 `variant`、`size` 等 Attribute/Property 控制样式。还可提供可继承的 CSS 自定义属性 `--company-button-bg` 或通过 `part="button"` + `::part(button)` 暴露定制入口。注意 Web Components 不等于必然使用 Shadow DOM。
+- **第 2 问正确但未展开**：原生 `addEventListener('confirm', handler)` 可以监听派发在宿主自定义元素上的 `CustomEvent`；通过 `event.detail.id` 获取数据。
+
+```ts
+const el = document.querySelector('company-button');
+el?.addEventListener('confirm', (event) => {
+  const { id } = (event as CustomEvent<{ id: number }>).detail;
+  console.log(id);
+});
+```
+
+**补充区别**：事件如果从 Shadow DOM 内部元素派发，是否能穿过 Shadow Boundary 还取决于 `bubbles` 和 `composed` 等事件配置。
 
 ## 评分
 
-待追问结束后评定。
+待第二轮追问后评定。
