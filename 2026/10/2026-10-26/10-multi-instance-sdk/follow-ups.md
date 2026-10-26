@@ -1,6 +1,6 @@
 # 跨框架 SDK 多实例隔离与生命周期 · 追问与答题记录
 
-**状态：第一轮追问已回答；第二轮追问待答**
+**状态：两轮追问已完成；最终评分 78/100**
 
 ## 用户原始回答（原文）
 
@@ -65,16 +65,31 @@ createRoot(appContainer).render(
 // OrderApp 内部：createPortal(<OrderModal />, portalContainer)
 ```
 
-## 第二轮追问（待答）
+## 第二轮追问（已答）
 
 **问题 1：异步计价请求竞态**。用户快速依次输入数量 1、2、3，SDK 发起 R1、R2、R3。响应顺序却是 R3、R1、R2。如何确保最终界面只展示数量 3 的报价？仅调用 `AbortController.abort()` 是否足够？为什么？
 
 **问题 2：destroy 生命周期**。R1 请求未返回，宿主执行 `sdk.destroy()`，随后 R1 才返回。你会如何实现 `destroy()`，保证 React 不会再被更新、请求和事件监听器被清理，并且连续调用两次 `destroy()` 不报错？
 
-## 评分
+## 第二轮追问：用户原始回答（原文）
 
-待第二轮追问后评定。
+> 1. 使用锁方案,或者返回完整的数据,让使用者去匹配
+> 2. 知道,不能
+>
+> 1) 清理react组件,各种回调时间,等等
+> 2) 在这个react组件内使用这个请求,如果react组件被销毁了,则在useEffectg的清理函数中销毁这个
+> 3) 检测实例,如果已经不存在了,则对第二次不做反应
 
-## 评分
+### 第二轮点评与正确答案
 
-待追问结束后评定。
+- **竞态（部分正确）**：互斥锁可串行化请求但会拖慢最新报价；“让使用者匹配”接近正确答案。推荐 SDK 内部采用 **latest-request-wins**：每次请求分配递增序号，响应提交前验证序号仍为最新；也可核对数量/请求标识，不能把一致性责任全部推给宿主。
+- **AbortController（正确）**：新请求开始时 `abort()` 旧请求可节省资源，但不能取消所有已经开始的异步计算、Promise 后续操作或服务器副作用；应组合请求序号、`signal.aborted` 检查。
+- **资源清理（正确但需展开）**：`root.unmount()`、取消未完成请求、清除定时器、事件订阅、Observer、WebSocket、Portal/Modal、SDK 自建 DOM、回调等。不可删除宿主提供的容器。
+- **useEffect 清理（正确但不覆盖所有场景）**：Effect 创建的请求可在 cleanup 中 abort 并设置 active=false；SDK 类直接创建的请求不一定由 React Effect 管理，必须有 SDK 实例级销毁标记和请求控制器。异步完成后还要检查 `destroyed`。
+- **幂等销毁（正确）**：`if (destroyed) return`；先置位，再清理，防止同步回调或异步操作使用已释放资源。
+
+完整示例、请求序号 + AbortController、React Effect 清理、生命周期状态机、跨框架测试和官方参考见 [README.md](./README.md)。
+
+## 最终评分：78/100
+
+跨框架 SDK 类/Web Components 设计、Axios 隔离、Portal 与 Shadow DOM 理解正确；对请求竞态的首选方案和 SDK 全局生命周期治理还需加强。
