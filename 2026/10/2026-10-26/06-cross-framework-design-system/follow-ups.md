@@ -1,6 +1,6 @@
 # 跨技术栈组件库与设计系统治理 · 追问与答题记录
 
-**状态：第一轮追问已回答，第二轮追问待答**
+**状态：两轮追问已完成；最终评分 75/100**
 
 ## 用户原始回答（原文）
 
@@ -45,7 +45,7 @@
 1. Vue 2 或 NEJ 项目如果想更改按钮内部的背景色，直接写 `company-button button { background: red }` 能生效吗？为什么？你会提供什么主题定制接口？
 2. 宿主应用如何获取 `confirm` 事件携带的 `id`？请说出一个原生 JS 方案。
 
-## 第二轮追问（待答）
+## 第二轮追问（已答）
 
 如果组件不是在 custom element 宿主节点上派发事件，而是在 Shadow DOM **内部的 button 元素**上派发：
 
@@ -75,6 +75,28 @@ el?.addEventListener('confirm', (event) => {
 
 **补充区别**：事件如果从 Shadow DOM 内部元素派发，是否能穿过 Shadow Boundary 还取决于 `bubbles` 和 `composed` 等事件配置。
 
-## 评分
+## 第二轮追问：用户原始回答
 
-待第二轮追问后评定。
+> 不能,不知道
+
+### 点评
+
+- 判断“外部不一定能收到”正确。由 Shadow DOM **内部按钮**派发的 `CustomEvent`，默认 `bubbles: false`、`composed: false`，不会自动传播到宿主。
+- 对外公开的事件通常写为：
+
+```ts
+button.dispatchEvent(new CustomEvent("confirm", {
+  detail: { id: 123 },
+  bubbles: true,
+  composed: true,
+}));
+```
+
+- `bubbles` 控制普通冒泡；`composed` 控制是否穿过 Shadow DOM 边界。细节：`composed: true` 的事件即使 `bubbles: false`，宿主也可能在特殊的宿主目标阶段收到；为便于宿主及其祖先监听，公共事件通常两者都设置为 `true`。
+- 若由 Custom Element **宿主本身** `this.dispatchEvent(...)` 派发，宿主上的监听器直接可收到，不需要穿越 Shadow DOM。
+
+## 最终评分：75/100
+
+跨框架复用方案方向正确，知道 Shadow DOM 样式隔离和原生事件监听；需补充 Design Token 分层、适配层职责、CSS 变量/`::part`、事件 `bubbles`/`composed` 及版本治理。
+
+详细标准答案见 [README.md](./README.md)。
