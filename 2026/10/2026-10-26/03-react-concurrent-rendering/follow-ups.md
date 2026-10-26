@@ -1,6 +1,6 @@
 # React Suspense、并发渲染与 Transition · 追问与答题记录
 
-**状态：主问题已回答，第一轮追问待答**
+**状态：第一轮追问已回答并讲解，待确认理解**
 
 ## 用户原始回答（原文）
 
@@ -18,7 +18,7 @@
 3. 组件函数执行完不一定 Commit DOM：Render 阶段可能被中断、重做或放弃，Commit 阶段才提交 DOM。
 4. 本题尚未完成，暂不做最终评分。
 
-## 第一轮追问（待答）
+## 第一轮追问（已答）
 
 ```tsx
 function SearchPage() {
@@ -40,3 +40,21 @@ function SearchPage() {
 ## 第二轮追问（如有）
 
 待第一轮回答后决定；最多两轮。
+
+## 第一轮追问：用户原话
+
+> 1. useDeferredValue其实我还是有一点搞不懂这两个都区别,你能划分出来看一下吗
+> 2. 不能,这个只是延后呀,最好是用切片或者换成worker里面执行
+
+### 点评与补充讲解
+
+- 第 2 问正确：`useDeferredValue` 不能自动将 800ms 同步计算切片或移到其他线程；可考虑主线程任务切片或 Web Worker。
+- 第 1 问用户明确表示尚未理解，因此先解释，不据此给最终评分。
+- `useTransition`：有权调用 `setState` 时，将某次状态更新标记为非紧急；可用 `isPending` 表示过渡待处理。
+- `useDeferredValue`：接收一个已经存在的值，让使用该值的 UI 在紧急更新中暂时保留旧值，随后以可中断的后台渲染追赶新值；无需另设第二个 state。
+- 典型对比：`setInput(value); startTransition(() => setQuery(value))` vs `const deferredInput = useDeferredValue(input)`。
+- `useDeferredValue` 不是 debounce，没有固定延迟；若慢列表作为子组件，为避免父组件紧急渲染时仍执行慢列表，通常还需配合 `React.memo`。
+- `startTransition` 回调本身立即执行，降低优先级的是其中调度的 React 状态更新，并不是将任意同步计算放到后台线程。
+- 官方文档：https://react.dev/reference/react/useTransition 和 https://react.dev/reference/react/useDeferredValue
+
+**状态：待用户确认理解后再进行下一轮追问或结束。**
