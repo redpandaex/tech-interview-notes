@@ -1,6 +1,6 @@
 # 第 4 天 · 第 2 题：Markdown 富文本 XSS 与 CSP
 
-日期：2026-10-27 ｜状态：进行中（第一轮追问已完成，等待后续追问）｜初步评分：**45/100**，第一轮追问：**90/100**（不是最终分）
+日期：2026-10-27 ｜状态：**已完成**｜最终评分：**68/100**（初步回答 45/100，第一轮追问 90/100）
 
 ## 题目
 
@@ -77,11 +77,59 @@ function MarkdownPreview({ content }: { content: string }) {
 - 跨源 `https://cdn.other.com/sdk.js`：被 script-src 阻止。
 - `fetch("https://api.other.com/users")`：被 connect-src 阻止。
 
-## 评分进度
-
-初步回答 45/100；第一轮追问 90/100；最终评分待定。
-
 参考：
 - https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy
 - https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP
 - https://github.com/cure53/DOMPurify
+
+## 最后一轮追问：开发环境 CORS 与 Vite 代理
+
+**题目：** React/Vite 前端在 `http://localhost:5173`，后端在 `http://localhost:8080`，浏览器跨源 fetch 产生 CORS 错误。解释原因、后端响应头、Vite 解决方案。
+
+**用户原始回答：**
+
+> 1. 因为端口不同
+> 2. 一般是修改后端,在开发中可以自己配置
+> 3. 开发中的有一个devServer?
+
+**解析：**
+
+1. 即使主机都是 localhost，端口 5173 与 8080 不同，Origin 不同，属于跨源。
+2. CORS 由服务端响应头声明，例如 `Access-Control-Allow-Origin: http://localhost:5173`；预检还需处理 OPTIONS、允许方法/请求头；Cookie 等凭据需要 `Access-Control-Allow-Credentials`，不能随意与通配符 `*` 配合。前端自行添加 `Access-Control-Allow-Origin` 请求头不能解决。
+3. Vite 是 **`server.proxy`**；Webpack DevServer 常用 **`devServer.proxy`**。示例：
+
+```ts
+// vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+    },
+  },
+});
+```
+
+前端请求必须使用相对路径 `fetch("/api/users")`，使浏览器访问同源 Vite 开发服务器，再由代理转发到后端；直接请求 `http://localhost:8080/api/users` 会绕过代理。代理不是关闭 CORS，而是使浏览器看到的请求同源。生产环境通常通过反向代理/API 网关或后端 CORS 处理。
+
+## 最终评分：68/100
+
+| 维度 | 得分 |
+|---|---:|
+| XSS 原理与 React 转义机制 | 13/20 |
+| 存储型与 DOM 型 XSS | 7/15 |
+| HTML Sanitization 与 URL 安全 | 12/20 |
+| CSP 原理与工程应用 | 11/20 |
+| 同源策略、CORS 与开发代理 | 25/25 |
+| **总分** | **68/100** |
+
+第一轮追问 **90/100**。初次独立回答对 XSS 分类、React HTML 注入与 CSP 不够准确；在讲解后能正确回答 React 转义、同源、CORS 和代理。复习重点：富文本 XSS 安全边界、Sanitization、CSP 指令。
+
+参考：
+- https://vite.dev/config/server-options#server-proxy
