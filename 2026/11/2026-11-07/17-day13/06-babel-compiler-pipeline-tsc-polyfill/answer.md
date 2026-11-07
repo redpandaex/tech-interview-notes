@@ -22,3 +22,16 @@ Babel 三阶段：
 2. Transform：插件遍历并修改 AST。
 3. Generate：生成目标代码。
 
+
+## 追问：语法转换与 Promise Polyfill
+
+### 用户原始回答
+
+> 1. 通过preset和polyfill机制
+> 2. 不一定吧
+
+**反馈：**
+- 第 1 问方向正确，但应具体说明：箭头函数由 `@babel/preset-env` 中相应的语法转换插件转换；Promise 是运行时 API，需要 `core-js` 等 Polyfill。
+- 第 2 问正确。仅配置 `@babel/preset-env` 不代表 Promise 一定会被补齐。需要配置 Polyfill 注入策略，例如 `useBuiltIns: "usage"` 并配置 `corejs` 版本，或使用 entry 方式。
+
+**核心记忆：** Babel 语法转换不等于运行时 API Polyfill。新语法可以被改写为旧语法，但旧浏览器仍可能缺少 Promise 等 API。
